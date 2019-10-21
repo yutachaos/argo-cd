@@ -3,18 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
+	"k8s.io/klog"
 	"os"
+	"path/filepath"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-
-	// load the gcp plugin (required to authenticate against GKE clusters).
-	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
-	// load the oidc plugin (required to authenticate with OpenID Connect).
-	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
+	"k8s.io/client-go/util/homedir"
 
 	"github.com/argoproj/argo-cd/common"
 	"github.com/argoproj/argo-cd/controller"
@@ -25,6 +23,10 @@ import (
 	"github.com/argoproj/argo-cd/util/cli"
 	"github.com/argoproj/argo-cd/util/settings"
 	"github.com/argoproj/argo-cd/util/stats"
+	// load the gcp plugin (required to authenticate against GKE clusters).
+	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	// load the oidc plugin (required to authenticate with OpenID Connect).
+	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 )
 
 const (
@@ -55,8 +57,19 @@ func newCommand() *cobra.Command {
 		RunE: func(c *cobra.Command, args []string) error {
 			cli.SetLogLevel(logLevel)
 			cli.SetGLogLevel(glogLevel)
+			var kubeconfig string
+			if home := homedir.HomeDir(); home != "" {
+				// build kubeconfig path from $HOME dir
+				kubeconfig = filepath.Join(home, ".kube", "config")
+			}
 
-			config, err := clientConfig.ClientConfig()
+			config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+			if err != nil {
+				klog.Fatalf("Error building kubeclient: %s", err.Error())
+			}
+			if err != nil {
+				klog.Fatalf("Error building kubeclient: %s", err.Error())
+			}
 			errors.CheckError(err)
 			config.QPS = common.K8sClientConfigQPS
 			config.Burst = common.K8sClientConfigBurst
